@@ -1,5 +1,9 @@
 # Changelog
 
+### Unreleased
+
+- add RestoringPointScanner service for restoring point discovery
+
 ### 1.0.5
 
 - new file's content is now empty instead of null.

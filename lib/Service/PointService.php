@@ -31,7 +31,6 @@ declare(strict_types=1);
 
 namespace OCA\Backup\Service;
 
-use Exception;
 use OC;
 use OC\Files\AppData\Factory;
 use OCA\Backup\AppInfo\Application;
@@ -130,6 +129,9 @@ class PointService {
 	/** @var ConfigService */
 	private $configService;
 
+	/** @var RestoringPointScanner */
+	private $restoringPointScanner;
+
 	/** @var AppDataRootWrapper */
 	private $appDataRoot;
 
@@ -165,7 +167,8 @@ class PointService {
 		FilesService $filesService,
 		OutputService $outputService,
 		ActivityService $activityService,
-		ConfigService $configService
+		ConfigService $configService,
+		RestoringPointScanner $restoringPointScanner
 	) {
 		$this->pointRequest = $pointRequest;
 		$this->changesRequest = $changesRequest;
@@ -179,6 +182,7 @@ class PointService {
 		$this->outputService = $outputService;
 		$this->activityService = $activityService;
 		$this->configService = $configService;
+		$this->restoringPointScanner = $restoringPointScanner;
 
 		$this->setup('app', 'backup');
 	}
@@ -639,16 +643,7 @@ class PointService {
 	 * @throws NotPermittedException
 	 */
 	public function scanFoldersFromAppData(): array {
-		$this->initBackupFS();
-
-		foreach ($this->appDataRoot->getFolders() as $pointId) {
-			try {
-				$this->generatePointFromAppData($pointId);
-			} catch (Exception $e) {
-			}
-		}
-
-		return [];
+		return $this->restoringPointScanner->scanFoldersFromAppData();
 	}
 
 
@@ -662,33 +657,7 @@ class PointService {
 	 * @throws SignatoryException
 	 */
 	public function generatePointFromAppData(string $pointId): RestoringPoint {
-		$tmp = new RestoringPoint();
-		$tmp->setId($pointId);
-		$this->initBaseFolder($tmp);
-
-		$folder = $tmp->getBaseFolder();
-
-		try {
-			$file = $folder->getFile(MetadataService::METADATA_FILE);
-		} catch (NotFoundException $e) {
-			throw new RestoringPointNotFoundException('could not find restoring point in appdata');
-		}
-
-		/** @var RestoringPoint $point */
-		try {
-			$point = $this->deserializeJson($file->getContent(), RestoringPoint::class);
-		} catch (InvalidItemException $e) {
-			throw new RestoringPointNotFoundException('invalid metadata');
-		} catch (NotFoundException $e) {
-			throw new RestoringPointNotFoundException('cannot access ' . MetadataService::METADATA_FILE);
-		} catch (NotPermittedException $e) {
-			throw new RestoringPointNotFoundException('cannot read ' . MetadataService::METADATA_FILE);
-		}
-
-		$this->generateHealth($point);
-		$this->pointRequest->save($point);
-
-		return $point;
+		return $this->restoringPointScanner->generatePointFromAppData($pointId);
 	}
 
 
